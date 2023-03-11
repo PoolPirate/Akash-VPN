@@ -1,8 +1,26 @@
 <script lang="ts">
+  import { onMount } from 'svelte'
+  import { writable } from 'svelte/store'
+  import type { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
   import '../app.css'
 
   import icons from './assets/icons.svg'
   import Versions from './components/Versions.svelte'
+
+  const magischeZahl = 2;
+  let virtualAdapterIsInstalled = writable(false);
+  let walletConected = writable(false);
+  let mnemonic = "";
+  let wallet:DirectSecp256k1HdWallet;
+  let Address;
+  onMount(() => {
+    wallet = window.api.getWallet();
+    Address = wallet.getAccounts()[0].address;
+    walletConected.set(window.api.isWalletConnected());
+    console.log($walletConected + " walletConected")
+    virtualAdapterIsInstalled.set(window.api.listVirtualAdapter(magischeZahl));
+    console.log($virtualAdapterIsInstalled + " virtualAdapterIsInstalled")
+  })
 </script>
 
 <div class="container">
@@ -11,6 +29,10 @@
   <svg class="hero-logo" viewBox="0 0 900 300">
     <use xlink:href={`${icons}#electron`} />
   </svg>
+  <button class:hidden={$virtualAdapterIsInstalled} on:click={() => window.api.createVirtualAdapter(magischeZahl)}>createVirtualAdapter</button>
+  <div class:hidden={!$walletConected}> wallet Address:{Address}</div>
+  <input class:hidden={$walletConected} type="text" bind:value={mnemonic} placeholder="mnemonic"> 
+  <button class:hidden={$walletConected} on:click={() => window.api.importWallet(mnemonic)}>importWallet</button>
   <h2 class="hero-text">
     You've successfully created an Electron project with Svelte and TypeScript
   </h2>
