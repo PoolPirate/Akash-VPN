@@ -1,146 +1,100 @@
 <script lang="ts">
-  import { onMount } from 'svelte'
-  import { writable } from 'svelte/store'
-  import type { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
   import '../app.css'
+  import Versions from './components/Versions.svelte';
 
-  import icons from './assets/icons.svg'
-  import Versions from './components/Versions.svelte'
 
-  const magischeZahl = 2;
-  let virtualAdapterIsInstalled = writable(false);
-  let walletConected = writable(false);
-  let mnemonic = "";
-  let wallet:DirectSecp256k1HdWallet;
-  let Address;
-  onMount(() => {
-    wallet = window.api.getWallet();
-    Address = wallet.getAccounts()[0].address;
-    walletConected.set(window.api.isWalletConnected());
-    console.log($walletConected + " walletConected")
-    virtualAdapterIsInstalled.set(window.api.listVirtualAdapter(magischeZahl));
-    console.log($virtualAdapterIsInstalled + " virtualAdapterIsInstalled")
-  })
+
+  //user input
+  let mnemonic = null;
+  let password = null;
+
+  //temporary
+  let walletAddress = null;
+  let walletBalance = 0;
+
+  let selectedServer = null;
+  let servers = ["server1", "server2", "server3"];
+
+  let currentStep = 0;
+  function showStep(step) {
+    currentStep = step;
+  }
+
 </script>
 
+<button on:click={() => showStep(0)}>{currentStep}</button>
+<h3>mnemonic : {mnemonic}</h3>
+<h3>password : {password}</h3>
+<h3>walletAddress : {walletAddress}</h3>
+<h3>walletBalance : {walletBalance}</h3>
+
+
 <div class="container">
+  {#if currentStep === 0}
+    <h1>Welcome to the Akash VPN</h1>
+    <button on:click={() => showStep(1)}>Continue</button>
+    <button on:click={() => showStep(2)}>Set New Password</button>
+  {/if}
+
+  {#if currentStep === 1}
+    <input type="text" bind:value={password} placeholder="Enter your password">
+    <button on:click={() => showStep(3)}>Continue</button>
+  {/if}
+
+  {#if currentStep === 2}
+    <h3>Please note that if you set a new password, you will lose access to
+      any previously stored wallets that were encrypted with the old password. </h3>
+    <input type="text" bind:value={password} placeholder="Enter New password">
+    <button on:click={() => showStep(3)}>Continue</button>
+  {/if}
+
+  {#if currentStep === 3 || currentStep === 4 }
+    {#if walletAddress == null}
+      <p> no stored Wallet found</p>
+      <button on:click={() => showStep(5)}>Import Wallet</button>
+      <button on:click={() => {if(akashWallet.test()){showStep(4)} else showStep(2)} }>New Wallet</button>
+    {:else}
+      <p>Wallet Address: {walletAddress}</p>
+      <p>Wallet Balance: {walletBalance}</p>
+      {#if walletBalance < 5}
+        <p>Insufficient funds</p>
+      {:else }
+        <button on:click={() => showStep(6)}>Next</button>
+      {/if}
+    {/if}
+  {/if}
+
+  {#if currentStep === 5}
+    <p> no stored Wallet found</p>
+    <input type="text" bind:value={mnemonic} placeholder="Enter your mnemonic">
+    <button on:click={() => {if(window.api.akashWallet.importWallet(mnemonic)){showStep(4)} else showStep(2)} }>Import</button>
+  {/if}
+
+  {#if currentStep === 6}
+    <label>
+      Select a server:
+      <select bind:value={selectedServer}>
+        {#each servers as server}
+          <option value={server}>{server}</option>
+        {/each}
+      </select>
+    </label>
+    <button on:click={() => showStep(7)}>Next</button>
+  {/if}
+
+  {#if currentStep === 7}
+    <button on:click={()=> {if(window.api.softether.connectToVPN('add','port','user','pass')){showStep(8)}else showStep(99)}}>Connect to VPN</button>
+  {/if}
+
+  {#if currentStep === 8}
+    <button on:click={()=> {if(window.api.softether.disconnectFromVPN()){showStep(7)}else showStep(99)}}>Disconnect from VPN</button>
+    <button on:click={()=> {if(window.api.softether.deleteVirtualAdapter('name')){showStep(1)}else showStep(99)}}>Kill VPN</button>
+  {/if}
+
+  {#if currentStep === 99}
+    <p>Error</p>
+  {/if}
   <Versions />
-
-  <svg class="hero-logo" viewBox="0 0 900 300">
-    <use xlink:href={`${icons}#electron`} />
-  </svg>
-  <button class:hidden={$virtualAdapterIsInstalled} on:click={() => window.api.createVirtualAdapter(magischeZahl)}>createVirtualAdapter</button>
-  <div class:hidden={!$walletConected}> wallet Address:{Address}</div>
-  <input class:hidden={$walletConected} type="text" bind:value={mnemonic} placeholder="mnemonic"> 
-  <button class:hidden={$walletConected} on:click={() => window.api.importWallet(mnemonic)}>importWallet</button>
-  <h2 class="hero-text">
-    You've successfully created an Electron project with Svelte and TypeScript
-  </h2>
-  <p class="hero-tagline">Please try pressing <code>F12</code> to open the devTool</p>
-
-  <div class="links">
-    <div class="link-item">
-      <a rel="noopener noreferrer" target="_blank" href="https://evite.netlify.app">Documentation</a
-      >
-    </div>
-    <div class="link-item link-dot">•</div>
-    <div class="link-item">
-      <a rel="noopener noreferrer" target="_blank" href="https://github.com/alex8088/electron-vite"
-        >Getting Help</a
-      >
-    </div>
-    <div class="link-item link-dot">•</div>
-    <div class="link-item">
-      <a
-        rel="noopener noreferrer"
-        target="_blank"
-        href="https://github.com/alex8088/quick-start/tree/master/packages/create-electron"
-      >
-        create-electron
-      </a>
-    </div>
-  </div>
-
-  <div class="features">
-    <div class="feature-item">
-      <article>
-        <h2 class="title">Configuring</h2>
-        <p class="detail">
-          Config with <span>electron.vite.config.ts</span> and refer to the
-          <a rel="noopener noreferrer" target="_blank" href="https://evite.netlify.app/config/"
-            >config guide</a
-          >.
-        </p>
-      </article>
-    </div>
-    <div class="feature-item">
-      <article>
-        <h2 class="title">HMR</h2>
-        <p class="detail">
-          Edit <span>src/renderer</span> files to test HMR. See
-          <a
-            rel="noopener noreferrer"
-            target="_blank"
-            href="https://evite.netlify.app/guide/hmr-in-renderer.html">docs</a
-          >.
-        </p>
-      </article>
-    </div>
-    <div class="feature-item">
-      <article>
-        <h2 class="title">Hot Reloading</h2>
-        <p class="detail">
-          Run <span>'electron-vite dev --watch'</span> to enable. See
-          <a
-            rel="noopener noreferrer"
-            target="_blank"
-            href="https://evite.netlify.app/guide/hot-reloading.html">docs</a
-          >.
-        </p>
-      </article>
-    </div>
-    <div class="feature-item">
-      <article>
-        <h2 class="title">Debugging</h2>
-        <p class="detail">
-          Check out <span>.vscode/launch.json</span>. See
-          <a
-            rel="noopener noreferrer"
-            target="_blank"
-            href="https://evite.netlify.app/guide/debugging.html">docs</a
-          >.
-        </p>
-      </article>
-    </div>
-    <div class="feature-item">
-      <article>
-        <h2 class="title">Source Code Protection</h2>
-        <p class="detail">
-          Supported via built-in plugin <span>bytecodePlugin</span>. See
-          <a
-            rel="noopener noreferrer"
-            target="_blank"
-            href="https://evite.netlify.app/guide/source-code-protection.html"
-          >
-            docs
-          </a>
-          .
-        </p>
-      </article>
-    </div>
-    <div class="feature-item">
-      <article>
-        <h2 class="title">Packaging</h2>
-        <p class="detail">
-          Use
-          <a rel="noopener noreferrer" target="_blank" href="https://www.electron.build"
-            >electron-builder</a
-          >
-          and pre-configured to pack your app.
-        </p>
-      </article>
-    </div>
-  </div>
 </div>
 
 <style>
@@ -153,117 +107,49 @@
     padding: 15px 30px 0 30px;
   }
 
-  .hero-logo {
-    margin-top: -0.4rem;
-    transition: all 0.3s;
+  body {
+    font-family: Arial, sans-serif;
+    margin: 0;
   }
 
-  @media (max-width: 840px) {
-    .hero-logo {
-      margin-top: -1.5rem;
-    }
-  }
-
-  .hero-text {
-    font-weight: 400;
-    color: #c2f5ff;
-    text-align: center;
-    margin-top: -0.5rem;
-    margin-bottom: 10px;
-  }
-
-  @media (max-width: 660px) {
-    .hero-logo {
-      display: none;
-    }
-
-    .hero-text {
-      margin-top: 20px;
-    }
-  }
-
-  .hero-tagline {
-    text-align: center;
-    margin-bottom: 14px;
-  }
-
-  .links {
+  #stepper {
     display: flex;
+    flex-direction: column;
     align-items: center;
-    justify-content: center;
-    margin-bottom: 24px;
-    font-size: 18px;
-    font-weight: 500;
+    margin-top: 50px;
   }
 
-  .links a {
-    font-weight: 500;
+  .step {
+    display: none;
   }
 
-  .links .link-item {
-    padding: 0 4px;
+  .step.active {
+    display: block;
   }
 
-  .features {
-    display: flex;
-    flex-wrap: wrap;
-    margin: -6px;
+  h1 {
+    font-size: 24px;
+    margin-bottom: 20px;
   }
 
-  .features .feature-item {
-    width: 33.33%;
-    box-sizing: border-box;
-    padding: 6px;
+  input[type="text"] {
+    margin-right: 10px;
+    padding: 5px;
+    width: 200px;
   }
 
-  .features article {
-    background-color: rgba(194, 245, 255, 0.1);
-    border-radius: 8px;
-    box-sizing: border-box;
-    padding: 12px;
-    height: 100%;
+  button {
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #007aff;
+    color: #fff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
   }
 
-  .features span {
-    color: #d4e8ef;
-    word-break: break-all;
-  }
-
-  .features .title {
-    font-size: 17px;
-    font-weight: 500;
-    color: #c2f5ff;
-    line-height: 22px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-  }
-
-  .features .detail {
-    font-size: 14px;
-    font-weight: 500;
-    line-height: 22px;
-    margin-top: 6px;
-  }
-
-  @media (max-width: 660px) {
-    .features .feature-item {
-      width: 50%;
-    }
-  }
-
-  @media (max-width: 480px) {
-    .links {
-      flex-direction: column;
-      line-height: 32px;
-    }
-
-    .links .link-dot {
-      display: none;
-    }
-
-    .features .feature-item {
-      width: 100%;
-    }
+  select {
+    padding: 5px;
   }
 </style>

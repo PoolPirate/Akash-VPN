@@ -1,52 +1,99 @@
-import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing'
+import { StargateClient } from '@cosmjs/stargate';
+import { DirectSecp256k1HdWallet, Registry } from '@cosmjs/proto-signing';
 
-const STORAGE_KEY = 'my_wallet'
+import * as crypto from 'crypto';
 
-export async function createWallet(): Promise<void> {
-  const wallet = await DirectSecp256k1HdWallet.generate()
-  const mnemonic = await wallet.mnemonic
-  const [account] = await wallet.getAccounts()
-
-  console.log(`Wallet created successfully.`)
-  console.log(`Address: ${account.address}`)
-  console.log(`Mnemonic: ${mnemonic}`)
-
-  // Store the mnemonic in local storage
-  localStorage.setItem(STORAGE_KEY, mnemonic)
+interface Wallet {
+  mnemonic: string;
+  address: string;
 }
 
-export async function importWallet(mnemonic: string): Promise<void> {
-  const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic)
-  const [account] = await wallet.getAccounts()
+export class AkashWallet {
+  private password: string;
+  private wallet: Wallet | null;
 
-  console.log(`Wallet imported successfully.`)
-  console.log(`Address: ${account.address}`)
-
-  // Store the mnemonic in local storage
-  localStorage.setItem(STORAGE_KEY, mnemonic)
-}
-
-export async function getWallet() {
-  const mnemonic = localStorage.getItem(STORAGE_KEY)
-  if (!mnemonic) {
-    throw new Error('No mnemonic found in local storage.')
+  constructor() {
+    this.password = '';
+    this.wallet = null;
   }
-  const wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic)
-  return wallet
-}
 
-export function isWalletConnected(): boolean {
-  const mnemonic = localStorage.getItem(STORAGE_KEY)
-  if (mnemonic == null || mnemonic.length == 0) {
-    return false
+  public test(): void {
+    console.log('test');
   }
-  return true
-}
 
-export function getAddress() {
-  const mnemonic = localStorage.getItem(STORAGE_KEY)
-  if (mnemonic == null || mnemonic.length == 0) {
-    return false
+  public async connect(): Promise<void> {
+    const rpc = 'http://akash.c29r3.xyz:80/rpc';
+    const client = await StargateClient.connect(rpc);
+    const id = client.getChainId();
+    const balance = client.getBalance(this.wallet.address, 'uakt');
   }
-  return true
+
+  public setPassword(password: string): void {
+    this.password = password;
+    this.wallet = this.loadWallet();
+  }
+
+  public getBalance(): number {
+    if (!this.wallet) {
+      throw new Error('No wallet loaded.');
+    }
+
+    return 5;
+  }
+
+  async createWallet(): Promise<void> {
+    const hdWallet = await DirectSecp256k1HdWallet.generate(24);
+    const mnemonic = hdWallet.mnemonic;
+    const address = await await hdWallet.getAccounts()[0];
+    this.wallet = { mnemonic, address };
+    this.saveWallet();
+  }
+
+  async importWallet(mnemonic: string): Promise<void> {
+    const hdWallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic);
+    const address = await await hdWallet.getAccounts()[0];
+    this.wallet = { mnemonic, address };
+    this.saveWallet();
+  }
+
+  private loadWallet(): Wallet | null {
+    try {
+      const encryptedData = localStorage.getItem('wallet');
+      if (!encryptedData) {
+        return null;
+      }
+      const decryptedData = this.decrypt(encryptedData);
+      return JSON.parse(decryptedData);
+    } catch (error) {
+      return null;
+    }
+  }
+
+  private saveWallet(): void {
+    if (!this.wallet) {
+      throw new Error('No wallet loaded.');
+    }
+    const data = JSON.stringify(this.wallet);
+    const encryptedData = this.encrypt(data);
+    localStorage.setItem('wallet', encryptedData);
+  }
+
+  private encrypt(data: string): string {
+    const iv = crypto.randomBytes(16);
+    const cipher = crypto.createCipheriv('aes-256-cbc', this.password, iv);
+    const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
+    return `${iv.toString('hex')}:${encrypted.toString('hex')}`;
+  }
+
+  private decrypt(data: string): string {
+    const [ivHex, encryptedHex] = data.split(':');
+    const iv = Buffer.from(ivHex, 'hex');
+    const encrypted = Buffer.from(encryptedHex, 'hex');
+    const decipher = crypto.createDecipheriv('aes-256-cbc', this.password, iv);
+    const decrypted = Buffer.concat([
+      decipher.update(encrypted),
+      decipher.final(),
+    ]);
+    return decrypted.toString();
+  }
 }
