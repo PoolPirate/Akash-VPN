@@ -1,28 +1,53 @@
 <script lang="ts">
   import '../app.css'
   import Versions from './components/Versions.svelte';
-
-
+  import { onMount } from 'svelte';
+  import { writable } from 'svelte/store';
 
   //user input
   let mnemonic = null;
   let password = null;
 
   //temporary
-  let walletAddress = null;
-  let walletBalance = 0;
+  let walletAddress = writable(null);
+  let walletBalance = writable(0);
 
-  let selectedServer = null;
+  let selectedServer = writable(null);
   let servers = ["server1", "server2", "server3"];
+
+  onMount(() => {
+    window.api.init();
+  });
 
   let currentStep = 0;
   function showStep(step) {
     currentStep = step;
   }
 
+  function createWallet() {
+    let wallet = window.api.createWallet(password);
+    walletAddress = wallet.address;
+  }
+  function importWallet() {
+    let wallet = window.api.importWallet(mnemonic,password);
+    walletAddress = wallet.address;
+  }
+  function getBalance() {
+    let balance = window.api.getBalance();
+    walletBalance = balance;
+  }
+
+  function loadWallet() {
+    let wallet = window.api.loadWallet(password);
+    walletAddress = wallet.address;
+  }
+
+
 </script>
 
+
 <button on:click={() => showStep(0)}>{currentStep}</button>
+<button on:click={() => window.api.createWallet()}>new</button>
 <h3>mnemonic : {mnemonic}</h3>
 <h3>password : {password}</h3>
 <h3>walletAddress : {walletAddress}</h3>
@@ -30,29 +55,29 @@
 
 
 <div class="container">
-  {#if currentStep === 0}
+  {#if currentStep === 0}  //welcome
     <h1>Welcome to the Akash VPN</h1>
-    <button on:click={() => showStep(1)}>Continue</button>
+    <button on:click={() => showStep(1)}>Log in</button>
     <button on:click={() => showStep(2)}>Set New Password</button>
   {/if}
 
-  {#if currentStep === 1}
+  {#if currentStep === 1} //login
     <input type="text" bind:value={password} placeholder="Enter your password">
     <button on:click={() => showStep(3)}>Continue</button>
   {/if}
 
-  {#if currentStep === 2}
+  {#if currentStep === 2} //set new password
     <h3>Please note that if you set a new password, you will lose access to
       any previously stored wallets that were encrypted with the old password. </h3>
     <input type="text" bind:value={password} placeholder="Enter New password">
     <button on:click={() => showStep(3)}>Continue</button>
   {/if}
 
-  {#if currentStep === 3 || currentStep === 4 }
+  {#if currentStep === 3 || currentStep === 4 } //check wallet
     {#if walletAddress == null}
       <p> no stored Wallet found</p>
       <button on:click={() => showStep(5)}>Import Wallet</button>
-      <button on:click={() => {if(akashWallet.test()){showStep(4)} else showStep(2)} }>New Wallet</button>
+      <button on:click={() => createWallet()}>New Wallet</button>
     {:else}
       <p>Wallet Address: {walletAddress}</p>
       <p>Wallet Balance: {walletBalance}</p>
@@ -64,10 +89,10 @@
     {/if}
   {/if}
 
-  {#if currentStep === 5}
+  {#if currentStep === 5} //import wallet
     <p> no stored Wallet found</p>
     <input type="text" bind:value={mnemonic} placeholder="Enter your mnemonic">
-    <button on:click={() => {if(window.api.akashWallet.importWallet(mnemonic)){showStep(4)} else showStep(2)} }>Import</button>
+    <button on:click={() => importWallet() }>Import</button>
   {/if}
 
   {#if currentStep === 6}
