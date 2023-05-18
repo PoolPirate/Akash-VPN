@@ -6,6 +6,7 @@ import * as crypto from 'crypto';
 export class AkashWallet {
   private wallet: DirectSecp256k1HdWallet | undefined;
   private address: string;
+  private client: StargateClient | undefined;
 
   constructor() {
     this.address = 'null';
@@ -23,15 +24,19 @@ export class AkashWallet {
     return this.decrypt(encryptedMnemonic, password);
   }
 
+  async connect() {
+    this.client = await StargateClient.connect('https://rpc.akashnet.net');
+  }
+
   async getBalance(): Promise<string> {
     console.log('getBalance');
     if (this.wallet == null || this.address == null) {
       throw new Error('No wallet loaded.');
     }
-    const client = await StargateClient.connect(
-      'https://rpc.akash.network:443'
-    );
-    const balanceResponse = await client.getBalance(this.address, 'uakt');
+    if (this.client == null) {
+      throw new Error('No connection to AkashNet');
+    }
+    const balanceResponse = await this.client.getBalance(this.address, 'uakt');
     const balance = balanceResponse.amount.toString();
     return balance.valueOf();
   }

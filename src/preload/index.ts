@@ -1,4 +1,4 @@
-import { contextBridge, ipcRenderer } from 'electron';
+import { contextBridge } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
 
 import { AkashWallet } from './wallet';
@@ -24,7 +24,18 @@ const api = {
     await akashWallet.loadWallet(password),
   importWallet: async (mnemonic: string, password: string) =>
     await akashWallet.importWallet(mnemonic, password),
-  //getBalance: async () => await akashWallet.getBalance(),
+  getBalance: async () => {
+    try {
+      const balance = await akashWallet.getBalance();
+      return balance;
+    } catch (error) {
+      console.error(error);
+      throw error;
+    }
+  },
+  connect: async () => {
+    await akashWallet.connect();
+  },
   createVirtualAdapter: (adapterName: string) =>
     softether.createVirtualAdapter(adapterName),
   deleteVirtualAdapter: (adapterName: string) =>
