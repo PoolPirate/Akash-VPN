@@ -42,17 +42,6 @@ const api = {
   disconnectFromVPN: () => softether.disconnectFromVPN(),
 };
 
-const web3API = {
-  getBalance: async (address) => {
-    try {
-      const balance = await ipcRenderer.invoke('getBalance', address);
-      return balance;
-    } catch (error) {
-      throw new Error('Failed to get balance.');
-    }
-  },
-};
-
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
@@ -60,7 +49,6 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI);
     contextBridge.exposeInMainWorld('api', api);
-    contextBridge.exposeInMainWorld('web3', web3API);
   } catch (error) {
     console.error(error);
   }
