@@ -3,69 +3,81 @@ import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 
 import * as crypto from 'crypto';
 
-interface Wallet {
-  mnemonic: string;
-  address: string;
-  publicKey: Uint8Array;
-}
-
 export class AkashWallet {
-  private wallet: Wallet | null;
+  private wallet: DirectSecp256k1HdWallet | undefined;
+  private address: string;
 
   constructor() {
-    this.wallet = null;
+    this.address = 'null';
   }
 
-  public async connect(): Promise<void> {
-    const rpc = 'http://akash.c29r3.xyz:80/rpc';
-    const client = await StargateClient.connect(rpc);
-    const id = client.getChainId();
-    const balance = client.getBalance(this.wallet.address, 'uakt');
+  getAddress(): string {
+    return this.address;
   }
 
-  public getBalance(): number {
+  getMnemonic(password: string): string {
+    const encryptedMnemonic = localStorage.getItem('mnemonic');
+    if (!encryptedMnemonic) {
+      throw new Error('no wallet saved');
+    }
+    return this.decrypt(encryptedMnemonic, password);
+  }
+
+  async getBalance(): Promise<string> {
     console.log('getBalance');
-    if (!this.wallet) {
+    if (this.wallet == null || this.address == null) {
       throw new Error('No wallet loaded.');
     }
-    return 5;
+    const client = await StargateClient.connect(
+      'https://rpc.akash.network:443'
+    );
+    const balanceResponse = await client.getBalance(this.address, 'uakt');
+    const balance = balanceResponse.amount.toString();
+    return balance.valueOf();
   }
 
   async createWallet(password: string) {
     console.log('createWallet');
-    const hdWallet = await DirectSecp256k1HdWallet.generate();
-    const mnemonic = hdWallet.mnemonic;
-    const accounts = await hdWallet.getAccounts();
-    const address = accounts[0].address;
-    const publicKey = accounts[0].pubkey;
-    this.wallet = { mnemonic, address, publicKey };
+    this.wallet = await DirectSecp256k1HdWallet.generate(21, {
+      prefix: 'akash',
+    });
+    let account = await this.wallet.getAccounts();
+    this.address = account[0].address;
     this.saveWallet(password);
-    return this.wallet;
+    return true;
   }
 
   async importWallet(mnemonic: string, password: string) {
     console.log('importWallet');
-    const hdWallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic);
-    const accounts = await hdWallet.getAccounts();
-    const address = accounts[0].address;
-    const publicKey = accounts[0].pubkey;
-    this.wallet = { mnemonic, address, publicKey };
+    this.wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic, {
+      prefix: 'akash',
+    });
+    let account = await this.wallet.getAccounts();
+    this.address = account[0].address;
     this.saveWallet(password);
-    return this.wallet;
+    return true;
   }
 
-  private loadWallet(password: string): Wallet | null {
+  async loadWallet(password: string) {
     console.log('loadWallet');
-    try {
-      const encryptedData = localStorage.getItem('wallet');
-      if (!encryptedData) {
-        return null;
-      }
-      const decryptedData = this.decrypt(encryptedData, password);
-      return JSON.parse(decryptedData);
-    } catch (error) {
-      return null;
+    const encryptedMnemonic = localStorage.getItem('mnemonic');
+    const checksumOld = localStorage.getItem('checksum');
+    if (!encryptedMnemonic || !checksumOld) {
+      throw new Error('no wallet saved');
     }
+    const mnemonic = this.decrypt(encryptedMnemonic, password);
+    //checksum
+    const checksum = crypto.createHash('sha256').update(mnemonic).digest('hex');
+    if (checksum != checksumOld) {
+      console.log('checksum mismatch');
+      return false;
+    }
+    //checksum
+    this.wallet = await DirectSecp256k1HdWallet.fromMnemonic(mnemonic);
+    let account = await this.wallet.getAccounts();
+    this.address = account[0].address;
+    this.saveWallet(password);
+    return true;
   }
 
   private saveWallet(password: string): void {
@@ -73,20 +85,26 @@ export class AkashWallet {
     if (!this.wallet) {
       throw new Error('No wallet loaded.');
     }
-    const data = JSON.stringify(this.wallet);
-    const encryptedData = this.encrypt(data, password);
-    const checksum = crypto.createHash('shar256', data);
-
-    localStorage.setItem('wallet', encryptedData);
+    const encryptedMnemonic = this.encrypt(password);
+    const mnemonic = this.wallet.mnemonic;
+    const checksum = crypto.createHash('sha256').update(mnemonic).digest('hex');
+    localStorage.setItem('checksum', checksum);
+    localStorage.setItem('mnemonic', encryptedMnemonic);
   }
 
-  private encrypt(data: string, password: string): string {
+  private encrypt(password: string): string {
     console.log('encrypt');
+    if (!this.wallet) {
+      throw new Error('No wallet loaded.');
+    }
+    const mnemonic = this.wallet.mnemonic;
     const key = crypto.scryptSync(password, 'GfG', 24);
-    const iv = Buffer.alloc(16, 0);
+    const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-192-cbc', key, iv);
-    const encrypted = Buffer.concat([cipher.update(data), cipher.final()]);
-    return `${iv.toString('hex')}:${encrypted.toString('hex')}`;
+    let encrypted = cipher.update(mnemonic, 'utf-8', 'hex');
+    encrypted += cipher.final('hex');
+    const encryptedData = `${iv.toString('hex')}:${encrypted}`;
+    return encryptedData;
   }
 
   private decrypt(data: string, password: string): string {

@@ -1,4 +1,4 @@
-import { contextBridge } from 'electron';
+import { contextBridge, ipcRenderer } from 'electron';
 import { electronAPI } from '@electron-toolkit/preload';
 
 import { AkashWallet } from './wallet';
@@ -16,12 +16,15 @@ function init() {
 // Custom APIs for renderer
 const api = {
   init,
-  test: () => akashWallet.test(),
-  createWallet: () => akashWallet.createWallet(),
-  importWallet: (mnemonic: string) => akashWallet.importWallet(mnemonic),
-  setPassword: (password: string) => akashWallet.setPassword(password),
-  getBalance: () => akashWallet.getBalance(),
-  connect: () => akashWallet.connect(),
+  getAddress: () => akashWallet.getAddress(),
+  getMnemonic: (password: string) => akashWallet.getMnemonic(password),
+  createWallet: async (password: string) =>
+    await akashWallet.createWallet(password),
+  loadWallet: async (password: string) =>
+    await akashWallet.loadWallet(password),
+  importWallet: async (mnemonic: string, password: string) =>
+    await akashWallet.importWallet(mnemonic, password),
+  //getBalance: async () => await akashWallet.getBalance(),
   createVirtualAdapter: (adapterName: string) =>
     softether.createVirtualAdapter(adapterName),
   deleteVirtualAdapter: (adapterName: string) =>
@@ -39,6 +42,17 @@ const api = {
   disconnectFromVPN: () => softether.disconnectFromVPN(),
 };
 
+const web3API = {
+  getBalance: async (address) => {
+    try {
+      const balance = await ipcRenderer.invoke('getBalance', address);
+      return balance;
+    } catch (error) {
+      throw new Error('Failed to get balance.');
+    }
+  },
+};
+
 // Use `contextBridge` APIs to expose Electron APIs to
 // renderer only if context isolation is enabled, otherwise
 // just add to the DOM global.
@@ -46,6 +60,7 @@ if (process.contextIsolated) {
   try {
     contextBridge.exposeInMainWorld('electron', electronAPI);
     contextBridge.exposeInMainWorld('api', api);
+    contextBridge.exposeInMainWorld('web3', web3API);
   } catch (error) {
     console.error(error);
   }

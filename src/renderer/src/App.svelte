@@ -1,19 +1,16 @@
 <script lang="ts">
-  import '../app.css'
-  import Versions from './components/Versions.svelte';
-  import { onMount } from 'svelte';
-  import { writable } from 'svelte/store';
+  import "../app.css";
+  import Versions from "./components/Versions.svelte";
+  import { onMount } from "svelte";
+  import { writable } from "svelte/store";
 
   //user input
   let mnemonic = null;
   let password = null;
 
   //temporary
-  let walletAddress = writable(null);
-  let walletBalance = writable(0);
-
-  let selectedServer = writable(null);
-  let servers = ["server1", "server2", "server3"];
+  let walletAddress = null;
+  let walletBalance = 0;
 
   onMount(() => {
     window.api.init();
@@ -24,100 +21,106 @@
     currentStep = step;
   }
 
-  function createWallet() {
-    let wallet = window.api.createWallet(password);
-    walletAddress = wallet.address;
+  async function createWallet() {
+    let wallet = await window.api.createWallet(password);
   }
-  function importWallet() {
-    let wallet = window.api.importWallet(mnemonic,password);
-    walletAddress = wallet.address;
+  async function importWallet() {
+    let wallet = await window.api.importWallet(mnemonic, password);
   }
-  function getBalance() {
-    let balance = window.api.getBalance();
-    walletBalance = balance;
+  async function getBalance() {
+    walletBalance = await window.api.getBalance();
   }
 
-  function loadWallet() {
-    let wallet = window.api.loadWallet(password);
-    walletAddress = wallet.address;
+  async function loadWallet() {
+    let wallet = await window.api.loadWallet(password);
   }
 
+  function getAddress() {
+    walletAddress = window.api.getAddress()
+  }
 
+  function getMnemonic(password:string) {
+    mnemonic = window.api.getMnemonic(password)
+  }
 </script>
 
 
 <button on:click={() => showStep(0)}>{currentStep}</button>
-<button on:click={() => window.api.createWallet()}>new</button>
-<h3>mnemonic : {mnemonic}</h3>
+<input type="text" bind:value={password} placeholder="Enter your password">
+<button on:click={() => createWallet(password)}>creat</button>
+<button on:click={() => loadWallet(password)}>load</button>
+<button on:click={() => getAddress()}>add</button>
+<button on:click={() => getMnemonic(password)}>mne</button>
+<button on:click={() => getBalance()}>bal</button>
+
+
 <h3>password : {password}</h3>
 <h3>walletAddress : {walletAddress}</h3>
 <h3>walletBalance : {walletBalance}</h3>
+<h3>mnemonic : {mnemonic}</h3>
 
 
 <div class="container">
   {#if currentStep === 0}  //welcome
     <h1>Welcome to the Akash VPN</h1>
     <button on:click={() => showStep(1)}>Log in</button>
-    <button on:click={() => showStep(2)}>Set New Password</button>
+    <button on:click={() => showStep(10)}>Create new Wallet</button>
   {/if}
 
   {#if currentStep === 1} //login
     <input type="text" bind:value={password} placeholder="Enter your password">
-    <button on:click={() => showStep(3)}>Continue</button>
+    <button on:click={() => {
+      try {
+        if(loadWallet(password))
+      showStep(2) //success
+      else {showStep(11)} //wrong password
+      }
+      catch (e) {
+        Error = e;
+        showStep(99)
+      }
+    }}>Continue</button>
   {/if}
 
-  {#if currentStep === 2} //set new password
-    <h3>Please note that if you set a new password, you will lose access to
-      any previously stored wallets that were encrypted with the old password. </h3>
-    <input type="text" bind:value={password} placeholder="Enter New password">
-    <button on:click={() => showStep(3)}>Continue</button>
-  {/if}
-
-  {#if currentStep === 3 || currentStep === 4 } //check wallet
-    {#if walletAddress == null}
-      <p> no stored Wallet found</p>
-      <button on:click={() => showStep(5)}>Import Wallet</button>
-      <button on:click={() => createWallet()}>New Wallet</button>
-    {:else}
-      <p>Wallet Address: {walletAddress}</p>
-      <p>Wallet Balance: {walletBalance}</p>
-      {#if walletBalance < 5}
-        <p>Insufficient funds</p>
-      {:else }
-        <button on:click={() => showStep(6)}>Next</button>
-      {/if}
+  {#if currentStep === 2} //wallet status
+    <p>Wallet Address: {walletAddress}</p>
+    <p>Wallet Balance: {walletBalance}</p>
+    <button on:click={() => getBalance()}>Update Balance</button>
+    {#if walletBalance < 5}
+      <p>Insufficient funds</p>
+      <p>deposit more or import a Wallet</p>
+      <button on:click={() => showStep(10)}>Import Wallet</button>
+    {:else }
+      <button on:click={() => showStep(3)}>Next</button>
     {/if}
   {/if}
 
-  {#if currentStep === 5} //import wallet
-    <p> no stored Wallet found</p>
-    <input type="text" bind:value={mnemonic} placeholder="Enter your mnemonic">
-    <button on:click={() => importWallet() }>Import</button>
+  {#if currentStep === 10}
+    <input type="text" bind:value={password} placeholder="Enter your password">
+    <button on:click={() => createWallet()}>Create Wallet</button>
+    <hr  class="rounded">
+    <input type="text" bind:value={mnemonic} placeholder="Enter your Mnemonic">
+    <button on:click={() => importWallet()}>Import Wallet</button>
   {/if}
 
-  {#if currentStep === 6}
-    <label>
-      Select a server:
-      <select bind:value={selectedServer}>
-        {#each servers as server}
-          <option value={server}>{server}</option>
-        {/each}
-      </select>
-    </label>
-    <button on:click={() => showStep(7)}>Next</button>
-  {/if}
-
-  {#if currentStep === 7}
-    <button on:click={()=> {if(window.api.softether.connectToVPN('add','port','user','pass')){showStep(8)}else showStep(99)}}>Connect to VPN</button>
-  {/if}
-
-  {#if currentStep === 8}
-    <button on:click={()=> {if(window.api.softether.disconnectFromVPN()){showStep(7)}else showStep(99)}}>Disconnect from VPN</button>
-    <button on:click={()=> {if(window.api.softether.deleteVirtualAdapter('name')){showStep(1)}else showStep(99)}}>Kill VPN</button>
+  {#if currentStep === 11}
+    <p>Wrong Password</p>
+    <input type="text" bind:value={password} placeholder="Enter your password">
+    <button on:click={() => {
+      try {
+        if(loadWallet(password))
+      showStep(2) //success
+      else {showStep(11)} //wrong password
+      }
+      catch (e) {
+        Error = e;
+        showStep(99)
+      }
+    }}>Continue</button>
   {/if}
 
   {#if currentStep === 99}
-    <p>Error</p>
+    <p>{Error}</p>
   {/if}
   <Versions />
 </div>
@@ -127,9 +130,9 @@
     flex: 1;
     display: flex;
     flex-direction: column;
-    max-width: 840px;
     margin: 0 auto;
     padding: 15px 30px 0 30px;
+    font-size: 60px;
   }
 
   body {
@@ -158,15 +161,31 @@
   }
 
   input[type="text"] {
-    margin-right: 10px;
-    padding: 5px;
-    width: 200px;
+    margin-top: 20px;
+    padding: 10px 20px;
+    font-size: 16px;
+    background-color: #b7d1ef;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+  }
+
+  input[type="text"]::placeholder { /* Chrome, Firefox, Opera, Safari 10.1+ */
+    color: #0079fd;
+    opacity: 1; /* Firefox */
+  }
+
+  hr.rounded {
+    margin-top: 20px;
+    border-top: 8px solid #bbb;
+    border-radius: 5px;
   }
 
   button {
     margin-top: 20px;
     padding: 10px 20px;
-    font-size: 16px;
+    font-size: 100%;
     background-color: #007aff;
     color: #fff;
     border: none;
