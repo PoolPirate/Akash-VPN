@@ -33,9 +33,6 @@ const api = {
       throw error;
     }
   },
-  connect: async () => {
-    await akashWallet.connect();
-  },
   createVirtualAdapter: (adapterName: string) =>
     softether.createVirtualAdapter(adapterName),
   deleteVirtualAdapter: (adapterName: string) =>
