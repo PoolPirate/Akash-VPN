@@ -16,6 +16,9 @@ function init() {
 // Custom APIs for renderer
 const api = {
   init,
+  performTransaction: () => {
+    akashWallet.performTransaction();
+  },
   getAddress: () => akashWallet.getAddress(),
   getMnemonic: (password: string) => akashWallet.getMnemonic(password),
   createWallet: async (password: string) =>

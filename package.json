@@ -22,7 +22,8 @@
   "dependencies": {
     "@akashnetwork/akashjs": "^0.4.2",
     "@electron-toolkit/preload": "^1.0.3",
-    "@electron-toolkit/utils": "^1.0.2"
+    "@electron-toolkit/utils": "^1.0.2",
+    "crypto-js": "^4.1.1"
   },
   "devDependencies": {
     "@electron-toolkit/tsconfig": "^1.0.1",

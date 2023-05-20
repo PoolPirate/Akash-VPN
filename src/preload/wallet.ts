@@ -1,18 +1,16 @@
 import { SigningStargateClient } from '@cosmjs/stargate';
 import { DirectSecp256k1HdWallet } from '@cosmjs/proto-signing';
 import { stargate } from '@akashnetwork/akashjs';
-import type { MsgCreateDeployment as MsgCreateDeploymentType } from '@akashnetwork/akashjs/build/protobuf/akash/deployment/v1beta1/deployment';
 import * as crypto from 'crypto';
 
 import { deployyaml } from './deploy';
 
-import {
-  DeploymentID,
-  MsgCreateDeployment,
-} from '@akashnetwork/akashjs/build/protobuf/akash/deployment/v1beta1/deployment';
 import type { StdFee } from '@cosmjs/amino/build/signdoc';
-import Long from 'long';
 import { SDL } from '@akashnetwork/akashjs/build/sdl';
+import { MsgCreateBid } from '@akashnetwork/akashjs/build/protobuf/akash/market/v1beta1/bid';
+import { MsgCreateDeployment } from "@akashnetwork/akashjs/build/protobuf/akash/deployment/v1beta1/deployment";
+import { MsgCreateCertificate } from '@akashnetwork/akashjs/build/protobuf/akash/cert/v1beta1/cert';
+import * as cer from "./certificates";
 
 export class AkashWallet {
   private wallet: DirectSecp256k1HdWallet | null;
@@ -34,27 +32,44 @@ export class AkashWallet {
       await this.connect();
     }
 
-    const deploymentID: DeploymentID = {
-      $type: 'akash.deployment.v1beta1.DeploymentID',
-      owner: this.address,
-      dseq: Long.ONE,
-    };
+    const a = await cer.loadActiveCertificate()
+    if(a.$type == 'Invalid Certificate'){
+      a = await cer.
+    }
 
     const sdl = await SDL.fromString(deployyaml, 'beta2').manifestVersion();
 
-    const msgpartial = {
-      $type: 'akash.deployment.v1beta1.MsgCreateDeployment',
-      id: deploymentID,
-      //groups: [],
-      version: sdl,
+    const msgCreateBidPartial = {
+      $type: 'akash.market.v1beta1.MsgCreateBid',
+      // price:,
+      // order:,
+      // provider:,
       deposit: {
         $type: 'cosmos.base.v1beta1.Coin',
         denom: 'uakt',
         amount: '50000',
       },
     };
-    const msg: MsgCreateDeploymentType =
-      MsgCreateDeployment.fromPartial(msgpartial);
+
+
+
+    const msgCreateBid = MsgCreateBid.fromPartial(msgCreateBidPartial);
+
+    const msgCreateCertificatePartial:MsgCreateCertificate = {
+
+    };
+
+    const msgCreateCertificate = MsgCreateCertificate.fromPartial(msgCreateCertificatePartial)
+
+    const msgCreateDeploymentPartial:MsgCreateDeployment = {
+      $type: 'akash.deployment.v1beta1.MsgCreateDeployment',
+      deposit:,
+      version,
+      groups:,
+      id:,
+
+    }
+    const msgCreateDeployment = MsgCreateDeployment.fromPartial(msg)
 
     const msgAny = {
       typeUrl: stargate.messages.MsgCreateDeployment,
@@ -79,6 +94,7 @@ export class AkashWallet {
 
     // @ts-ignore
     const txResponse = await this.client.broadcastTx(signedTx);
+    console.log(txResponse);
   }
 
   getAddress(): string {
@@ -146,7 +162,7 @@ export class AkashWallet {
   async loadWallet(password: string) {
     console.log('loadWallet');
     const encryptedMnemonic = localStorage.getItem('mnemonic');
-    const checksumOld = localStorage.getItem('checksum');
+    const checksumOld = localStorage.getItem('mnemonicchecksum');
     if (!encryptedMnemonic || !checksumOld) {
       throw new Error('no wallet saved');
     }
@@ -172,23 +188,19 @@ export class AkashWallet {
     if (!this.wallet) {
       throw new Error('No wallet loaded.');
     }
-    const encryptedMnemonic = this.encrypt(password);
+    const encryptedMnemonic = this.encrypt(this.wallet.mnemonic,password);
     const mnemonic = this.wallet.mnemonic;
     const checksum = crypto.createHash('sha256').update(mnemonic).digest('hex');
-    localStorage.setItem('checksum', checksum);
+    localStorage.setItem('mnemonicchecksum', checksum);
     localStorage.setItem('mnemonic', encryptedMnemonic);
   }
 
-  private encrypt(password: string): string {
+  private encrypt(data: string,password: string): string {
     console.log('encrypt');
-    if (!this.wallet) {
-      throw new Error('No wallet loaded.');
-    }
-    const mnemonic = this.wallet.mnemonic;
     const key = crypto.scryptSync(password, 'GfG', 24);
     const iv = crypto.randomBytes(16);
     const cipher = crypto.createCipheriv('aes-192-cbc', key, iv);
-    let encrypted = cipher.update(mnemonic, 'utf-8', 'hex');
+    let encrypted = cipher.update(data, 'utf-8', 'hex');
     encrypted += cipher.final('hex');
     const encryptedData = `${iv.toString('hex')}:${encrypted}`;
     return encryptedData;

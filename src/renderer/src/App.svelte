@@ -42,6 +42,10 @@
   function getMnemonic(password:string) {
     mnemonic = window.api.getMnemonic(password)
   }
+
+  function performTransaction(){
+    window.api.performTransaction()
+  }
 </script>
 
 
@@ -52,6 +56,7 @@
 <button on:click={() => getAddress()}>add</button>
 <button on:click={() => getMnemonic(password)}>mne</button>
 <button on:click={() => getBalance()}>bal</button>
+<button on:click={() => performTransaction()}>bal</button>
 
 
 <h3>password : {password}</h3>
